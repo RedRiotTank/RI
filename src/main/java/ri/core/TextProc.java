@@ -83,6 +83,7 @@ public class TextProc {
     private ArrayList<String> getLanguages(){
         ArrayList<String> languages = new ArrayList<>();
         String idioma_aux = "";
+        LanguageMapper mapper = new LanguageMapper();
         for (File f : files) {
             try{
                 InputStream is = new FileInputStream(f);
@@ -92,7 +93,8 @@ public class TextProc {
                 AutoDetectParser parser = new AutoDetectParser();
                 parser.parse(is, ch, metadata);
 
-                idioma_aux = detectLanguage(ch.toString());
+                idioma_aux = mapper.mapLanguage(detectLanguage(ch.toString()));
+
                 languages.add(idioma_aux);
 
             } catch (FileNotFoundException e){
@@ -111,49 +113,29 @@ public class TextProc {
     }
 
     // metodo que pinta la tabla con los datos de cada archivo
-    public void makeTable() throws IOException { // param -d
+    public void makeTable() throws IOException {
         ArrayList<String> names = getNames();
         ArrayList<String> formats = getFormats();
         ArrayList<String> encodings = getEncodings();
         ArrayList<String> languages = getLanguages();
-        try{
 
-            System.out.println("names: \n");
-            for(String name : names)
-                System.out.println(name);
-            System.out.println("formats: \n");
-            for(String format : formats)
-                System.out.println(format);
-            System.out.println("encodings: ");
-            for(String encoding : encodings){
-                System.out.println(encoding);
-            }
-            System.out.println("languages: \n");
-            for(String language : languages)
-                System.out.println(language);
+        int maxSize = names.size(); // todos los arrays tienen el mismo tamaño
 
+        System.out.printf("%-50s %-20s %-35s %-15s%n", "Name", "Format", "Encoding", "Language");
 
+        System.out.println("------------------------------------------------------------" +
+                "------------------------------------------------------");
 
-            /*
-            System.out.println("+-----------------------+-----------------------+");
-            System.out.println("|        names          |        formats        |");
-            System.out.println("+-----------------------+-----------------------+");
+        for (int i = 0; i < maxSize; i++) {
+            String name = i < names.size() ? names.get(i) : "";
+            String format = i < formats.size() ? formats.get(i) : "";
+            String encoding = i < encodings.size() ? encodings.get(i) : "";
+            String language = i < languages.size() ? languages.get(i) : "";
 
-            for (int i = 0; i < Math.max(names.size(), formats.size()); i++) {
-                String name = i < names.size() ? names.get(i) : "";
-                String format = i < formats.size() ? formats.get(i) : "";
-
-                System.out.printf("| %-21s | %-21s |\n", name, format);
-            }
-
-            System.out.println("+-----------------------+-----------------------+");
-
-*/
-
-        }catch (Exception e){
-            e.printStackTrace();
+            System.out.printf("%-50s %-20s %-35s %-15s%n", name, format, encoding, language);
         }
     }
+
 
     public void getAllLinks(){ // param -l
         List< Set<String> > links = new ArrayList<>();
@@ -234,6 +216,7 @@ public class TextProc {
         }
 
     }
+
 
     private boolean isHTML(File file) {
         String name = file.getName().toLowerCase();
