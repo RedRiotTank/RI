@@ -6,7 +6,13 @@ import org.apache.tika.language.detect.LanguageDetector;
 import org.apache.tika.metadata.Metadata;
 import org.apache.tika.parser.AutoDetectParser;
 import org.apache.tika.parser.ParseContext;
-import org.apache.tika.sax.BodyContentHandler;
+import org.apache.tika.parser.html.HtmlParser;
+import org.apache.tika.sax.*;
+import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Element;
+import org.jsoup.select.Elements;
+import org.xml.sax.ContentHandler;
 import org.xml.sax.SAXException;
 
 import java.io.*;
@@ -31,7 +37,6 @@ public class TextProc {
         String [] arrayAux;
         String aux = "";
         for(File f : files){
-            //System.out.println(f);
             arrayAux = f.toString().split("/");
             aux = arrayAux[arrayAux.length - 1];
             names.add(aux);
@@ -116,16 +121,13 @@ public class TextProc {
             System.out.println("names: \n");
             for(String name : names)
                 System.out.println(name);
-            System.out.println("\n");
             System.out.println("formats: \n");
             for(String format : formats)
                 System.out.println(format);
-            System.out.println("\n");
             System.out.println("encodings: ");
             for(String encoding : encodings){
                 System.out.println(encoding);
             }
-            System.out.println("\n");
             System.out.println("languages: \n");
             for(String language : languages)
                 System.out.println(language);
@@ -151,5 +153,90 @@ public class TextProc {
         }catch (Exception e){
             e.printStackTrace();
         }
+    }
+
+    public void getAllLinks(){ // param -l
+        List< Set<String> > links = new ArrayList<>();
+        String text = "";
+        for(File f: files){
+            try{
+                // Sets, uno auxiliar para almacenar los elementos completos y luego extraer lo que queramos y guardarlo en el final
+                Set<String> conjunto_enlaces_aux = new HashSet<>();
+                Set<String> conjunto_enlaces = new HashSet<>();
+
+                InputStream is = new FileInputStream(f);
+                Metadata metadata = new Metadata();
+                // Si es html se necesita otro parser y por lo tanto otros handlde...
+                if(isHTML(f)){
+                    List<Link> links_file; // para guardar los enlaces tal cual nos viene del contentHandler
+                    LinkContentHandler ch = new LinkContentHandler();
+                    ContentHandler textHandler = new BodyContentHandler();
+                    ToHTMLContentHandler toHTMLContentHandler = new ToHTMLContentHandler();
+
+                    TeeContentHandler teeContentHandler = new TeeContentHandler(ch, textHandler, toHTMLContentHandler);
+                    ParseContext parseContext = new ParseContext();
+                    HtmlParser parser = new HtmlParser();
+                    parser.parse(is,teeContentHandler, metadata, parseContext);
+
+                    // para obtener todos los enlaces en una lista
+                    links_file = ch.getLinks();
+                    // para cada enlace contenido en la lista, nos quedamos con aquellos que sean etiquetas <a> y tengan href
+                    for(Link link : links_file){
+                        String link_aux = "";
+                        link_aux = link.toString();
+                        if(link_aux.contains("<a href=\""))
+                            conjunto_enlaces_aux.add(link_aux); // se meten en un set auxiliar para luego procesarlos
+                    }
+
+                    // y para cada uno de los enlaces guardados en el set auxiliar, nos quedamos con la url
+                    for(String enlace : conjunto_enlaces_aux) {
+                        Document doc = Jsoup.parse(enlace);
+                        Elements enlaces = doc.select("a[href]");
+
+                        for (Element element : enlaces) {
+                            String href = element.attr("href");
+                            conjunto_enlaces.add(href);
+                        }
+                    }
+                // en caso de que no sea html:
+                } else {
+                    // se necesitan otros contentHandler
+                    BodyContentHandler ch = new BodyContentHandler();
+                    AutoDetectParser parser = new AutoDetectParser();
+                    parser.parse(is, ch, metadata);
+                    text = ch.toString(); // se obtiene todoo el texto
+
+                    String[] links_file_no_html = text.split("\\s"); // se hacen "tokens"
+                    // y nos quedamos con aquellos que parezcan un enlace
+                    for(String link : links_file_no_html){
+                        if(link.startsWith("http://") || link.startsWith("https://")){
+                            conjunto_enlaces.add(link);
+                        }
+                    }
+                }
+                links.add(conjunto_enlaces); // se añade el conjunto a la lista
+            } catch (TikaException | IOException | SAXException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        // y se saca por pantalla
+        for (int i = 0; i < links.size(); i++) {
+            Set<String> file_links = links.get(i);
+            ArrayList<String> names = getNames();
+            System.out.println("Enlaces en el archivo " + names.get(i) + ":");
+
+            for (String link : file_links) {
+                System.out.println(link);
+            }
+
+            System.out.println();
+        }
+
+    }
+
+    private boolean isHTML(File file) {
+        String name = file.getName().toLowerCase();
+        return name.endsWith(".html") || name.endsWith(".htm");
     }
 }
