@@ -19,44 +19,37 @@ import java.io.*;
 import java.util.*;
 
 public class TextProc {
-    private Tika tika = new Tika();
-    private Set<File> files = new HashSet<>() ;
+    private static final Tika tika = new Tika();
+    private FileProc fp;
 
-    public TextProc(String folderPath){
-        File folder = new File(folderPath);
+    public TextProc(FileProc fp){
+        this.fp = fp;
+    }
 
-        if(folder.isDirectory()){
-            files.addAll(Arrays.asList(folder.listFiles()));
-        } else {
-            System.out.println("No se pudo abrir el directorio");
-        }
+    public static Tika getTika(){
+        return tika;
     }
-    // metodo que devuelve el nombre del fichero
-    private ArrayList<String> getNames(){
-        ArrayList<String> names = new ArrayList<>();
-        String [] arrayAux;
-        String aux = "";
-        for(File f : files){
-            arrayAux = f.toString().split("/");
-            aux = arrayAux[arrayAux.length - 1];
-            names.add(aux);
-        }
-        return names;
-    }
+
     // metodo que devuelve los formatos de los archivos
-    private ArrayList<String> getFormats() throws IOException {
-        ArrayList<String> formats = new ArrayList<>();
-        for(File f : files){
-            formats.add(tika.detect(f));
-        }
-        return formats;
+    public ArrayList<String> getAFFormats() throws IOException {
+        return fp.getAFinfo((file) -> {
+            String format = null;
+            try {
+                format = tika.detect(file);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            return format;
+        });
+
     }
 
-    private ArrayList<String> getEncodings(){
-        ArrayList<String> codifications = new ArrayList<>();
-        for(File f : files){
-            try{
-                InputStream is = new FileInputStream(f);
+    public ArrayList<String> getEncodings(){
+        return fp.getAFinfo((file) -> {
+            String encoding = null;
+
+            try {
+                InputStream is = new FileInputStream(file);
                 Metadata metadata = new Metadata();
                 BodyContentHandler ch = new BodyContentHandler();
                 ParseContext parseContext = new ParseContext();
@@ -64,162 +57,166 @@ public class TextProc {
                 AutoDetectParser parser = new AutoDetectParser();
                 parser.parse(is, ch, metadata, parseContext);
 
-                String encoding = metadata.get("Content-Encoding");
-                //System.out.println(encoding);
-                if(encoding == null){ // para los archivos sin codificacion
-                    encoding = "without encoding (ex: txt)";
-                }
-                codifications.add(encoding);
+                encoding = metadata.get("Content-Encoding");
+
+                if(encoding == null) encoding = "without encoding (ex: txt)";
+
                 is.close();
-            } catch (FileNotFoundException e){
-                System.out.println("No se encontró el archivo");
-            } catch (TikaException | IOException | SAXException e) {
+            } catch (IOException e) {
+                e.printStackTrace();
+            } catch (SAXException | TikaException e) {
                 throw new RuntimeException(e);
             }
-        }
-        return codifications;
+
+            return encoding;
+        });
     }
 
-    private ArrayList<String> getLanguages(){
-        ArrayList<String> languages = new ArrayList<>();
-        String idioma_aux = "";
-        LanguageMapper mapper = new LanguageMapper();
-        for (File f : files) {
-            try{
-                InputStream is = new FileInputStream(f);
+
+    public ArrayList<String> getLanguages(){
+
+        return fp.getAFinfo((file) -> {
+            String language = null;
+            try {
+                InputStream is = new FileInputStream(file);
                 Metadata metadata = new Metadata();
                 BodyContentHandler ch = new BodyContentHandler();
 
                 AutoDetectParser parser = new AutoDetectParser();
                 parser.parse(is, ch, metadata);
 
-                idioma_aux = mapper.mapLanguage(detectLanguage(ch.toString()));
+                language = detectLanguage(ch.toString());
 
-                languages.add(idioma_aux);
-
-            } catch (FileNotFoundException e){
+                is.close();
+            } catch (IOException e) {
                 e.printStackTrace();
-            } catch (TikaException | IOException | SAXException e) {
+            } catch (TikaException | SAXException e) {
                 throw new RuntimeException(e);
             }
-        }
-        return languages;
+
+            return language;
+        });
+
+
     }
-    // metodo que devuelve el idioma de un texto
+
     private String detectLanguage(String text) throws IOException {
         LanguageDetector languageDetector = LanguageDetector.getDefaultLanguageDetector().loadModels();
 
         return languageDetector.detect(text).getLanguage();
     }
 
-    // metodo que pinta la tabla con los datos de cada archivo
-    public void makeTable() throws IOException {
-        ArrayList<String> names = getNames();
-        ArrayList<String> formats = getFormats();
-        ArrayList<String> encodings = getEncodings();
-        ArrayList<String> languages = getLanguages();
-
-        int maxSize = names.size(); // todos los arrays tienen el mismo tamaño
-
-        System.out.printf("%-50s %-20s %-35s %-15s%n", "Name", "Format", "Encoding", "Language");
-
-        System.out.println("------------------------------------------------------------" +
-                "------------------------------------------------------");
-
-        for (int i = 0; i < maxSize; i++) {
-            String name = i < names.size() ? names.get(i) : "";
-            String format = i < formats.size() ? formats.get(i) : "";
-            String encoding = i < encodings.size() ? encodings.get(i) : "";
-            String language = i < languages.size() ? languages.get(i) : "";
-
-            System.out.printf("%-50s %-20s %-35s %-15s%n", name, format, encoding, language);
-        }
-    }
+    //TODO: limpiar y optimizar
+    public Set<String> getFlinks(File file){
+        String text;
+        Set<String> links = new HashSet<>();
+        try{
+            // Sets, uno auxiliar para almacenar los elementos completos y luego extraer lo que queramos y guardarlo en el final
+            Set<String> conjunto_enlaces_aux = new HashSet<>();
 
 
-    public void getAllLinks(){ // param -l
-        List< Set<String> > links = new ArrayList<>();
-        String text = "";
-        for(File f: files){
-            try{
-                // Sets, uno auxiliar para almacenar los elementos completos y luego extraer lo que queramos y guardarlo en el final
-                Set<String> conjunto_enlaces_aux = new HashSet<>();
-                Set<String> conjunto_enlaces = new HashSet<>();
+            InputStream is = new FileInputStream(file);
+            Metadata metadata = new Metadata();
+            // Si es html se necesita otro parser y por lo tanto otros handlde...
+            if(utils.isHTML(file)){
+                List<Link> links_file; // para guardar los enlaces tal cual nos viene del contentHandler
+                LinkContentHandler ch = new LinkContentHandler();
+                ContentHandler textHandler = new BodyContentHandler();
+                ToHTMLContentHandler toHTMLContentHandler = new ToHTMLContentHandler();
 
-                InputStream is = new FileInputStream(f);
-                Metadata metadata = new Metadata();
-                // Si es html se necesita otro parser y por lo tanto otros handlde...
-                if(isHTML(f)){
-                    List<Link> links_file; // para guardar los enlaces tal cual nos viene del contentHandler
-                    LinkContentHandler ch = new LinkContentHandler();
-                    ContentHandler textHandler = new BodyContentHandler();
-                    ToHTMLContentHandler toHTMLContentHandler = new ToHTMLContentHandler();
+                TeeContentHandler teeContentHandler = new TeeContentHandler(ch, textHandler, toHTMLContentHandler);
+                ParseContext parseContext = new ParseContext();
+                HtmlParser parser = new HtmlParser();
+                parser.parse(is,teeContentHandler, metadata, parseContext);
 
-                    TeeContentHandler teeContentHandler = new TeeContentHandler(ch, textHandler, toHTMLContentHandler);
-                    ParseContext parseContext = new ParseContext();
-                    HtmlParser parser = new HtmlParser();
-                    parser.parse(is,teeContentHandler, metadata, parseContext);
+                // para obtener todos los enlaces en una lista
+                links_file = ch.getLinks();
+                // para cada enlace contenido en la lista, nos quedamos con aquellos que sean etiquetas <a> y tengan href
+                for(Link link : links_file){
+                    String link_aux = "";
+                    link_aux = link.toString();
+                    if(link_aux.contains("<a href=\""))
+                        conjunto_enlaces_aux.add(link_aux); // se meten en un set auxiliar para luego procesarlos
+                }
 
-                    // para obtener todos los enlaces en una lista
-                    links_file = ch.getLinks();
-                    // para cada enlace contenido en la lista, nos quedamos con aquellos que sean etiquetas <a> y tengan href
-                    for(Link link : links_file){
-                        String link_aux = "";
-                        link_aux = link.toString();
-                        if(link_aux.contains("<a href=\""))
-                            conjunto_enlaces_aux.add(link_aux); // se meten en un set auxiliar para luego procesarlos
-                    }
+                // y para cada uno de los enlaces guardados en el set auxiliar, nos quedamos con la url
+                for(String enlace : conjunto_enlaces_aux) {
+                    Document doc = Jsoup.parse(enlace);
+                    Elements enlaces = doc.select("a[href]");
 
-                    // y para cada uno de los enlaces guardados en el set auxiliar, nos quedamos con la url
-                    for(String enlace : conjunto_enlaces_aux) {
-                        Document doc = Jsoup.parse(enlace);
-                        Elements enlaces = doc.select("a[href]");
-
-                        for (Element element : enlaces) {
-                            String href = element.attr("href");
-                            conjunto_enlaces.add(href);
-                        }
-                    }
-                // en caso de que no sea html:
-                } else {
-                    // se necesitan otros contentHandler
-                    BodyContentHandler ch = new BodyContentHandler();
-                    AutoDetectParser parser = new AutoDetectParser();
-                    parser.parse(is, ch, metadata);
-                    text = ch.toString(); // se obtiene todoo el texto
-
-                    String[] links_file_no_html = text.split("\\s"); // se hacen "tokens"
-                    // y nos quedamos con aquellos que parezcan un enlace
-                    for(String link : links_file_no_html){
-                        if(link.startsWith("http://") || link.startsWith("https://")){
-                            conjunto_enlaces.add(link);
-                        }
+                    for (Element element : enlaces) {
+                        String href = element.attr("href");
+                        links.add(href);
                     }
                 }
-                links.add(conjunto_enlaces); // se añade el conjunto a la lista
-            } catch (TikaException | IOException | SAXException e) {
-                throw new RuntimeException(e);
+                // en caso de que no sea html:
+            } else {
+                // se necesitan otros contentHandler
+                BodyContentHandler ch = new BodyContentHandler();
+                AutoDetectParser parser = new AutoDetectParser();
+                parser.parse(is, ch, metadata);
+                text = ch.toString(); // se obtiene todoo el texto
+
+                String[] links_file_no_html = text.split("\\s"); // se hacen "tokens"
+                // y nos quedamos con aquellos que parezcan un enlace
+                for(String link : links_file_no_html){
+                    if(link.startsWith("http://") || link.startsWith("https://")){
+                        links.add(link);
+                    }
+                }
             }
+
+        } catch (TikaException | IOException | SAXException e) {
+            throw new RuntimeException(e);
         }
 
-        // y se saca por pantalla
-        for (int i = 0; i < links.size(); i++) {
-            Set<String> file_links = links.get(i);
-            ArrayList<String> names = getNames();
-            System.out.println("Enlaces en el archivo " + names.get(i) + ":");
-
-            for (String link : file_links) {
-                System.out.println(link);
-            }
-
-            System.out.println();
-        }
-
+        return links;
     }
 
 
-    private boolean isHTML(File file) {
-        String name = file.getName().toLowerCase();
-        return name.endsWith(".html") || name.endsWith(".htm");
+    //TODO: optimizar, hace lectura de código por cada iteración.
+    private static String processText(String text){
+
+        String processedText;
+
+        processedText = text.toLowerCase();
+
+        processedText = processedText.replaceAll("[\n\t]", " ");
+
+        processedText = processedText.replaceAll(RegexController.PUNCTUATION.getRegex(), "");
+
+        // Eliminar "." solo si está seguido por un espacio
+        processedText = processedText.replaceAll(RegexController.DOTANDSPACE.getRegex(), " ");
+
+        processedText = processedText.replaceAll(RegexController.EXPRESIONSIGS.getRegex(), "");
+
+        processedText = processedText.replaceAll(RegexController.QUOTES.getRegex(), "");
+
+        processedText = processedText.replaceAll(RegexController.EMDASH.getRegex(), " ");
+
+        processedText = processedText.replaceAll("\\s+", " ");
+
+        return processedText;
     }
+
+    public static List<Map.Entry<String, Integer>> getOrderedWordCount(File file) throws TikaException, IOException {
+        String content = processText(tika.parseToString(file));
+
+        Map<String, Integer> termFrequencyMap = countTermFrequencies(content);
+
+        return utils.orderTerms(termFrequencyMap);
+    }
+
+    private static Map<String, Integer> countTermFrequencies(String content) {
+        Map<String, Integer> termFrequencyMap = new HashMap<>();
+        String[] words = content.split(RegexController.SPACE.getRegex());
+
+        for (String word : words)
+            termFrequencyMap.put(word, termFrequencyMap.getOrDefault(word, 0) + 1);
+
+        return termFrequencyMap;
+    }
+
+
+
 }

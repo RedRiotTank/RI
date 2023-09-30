@@ -1,25 +1,55 @@
 package ri.core;
 
+import org.apache.tika.exception.TikaException;
+
+import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Set;
 
 public class Main {
-    public static void main(String[] args) throws IOException {
-        TextProc t = new TextProc(args[0]); // se pasa primero el directorio
+    public static void main(String[] args) throws IOException, TikaException {
+
+        if(args.length < 2){
+            System.out.println("No hay suficientes argumentos");
+            return;
+        } else if(args.length > 2){
+            System.out.println("Más argumentos de los necesarios");
+            return;
+        }
+
+        String dir = args[0];
+        String option = args[1];
+
+        FileProc fp = new FileProc(dir);
+        TextProc tp = new TextProc(fp);
+
+        ConsoleProc cp = new ConsoleProc(fp, tp);
+
+
+
         // si faltan parametros se para la ejecución
         if(args.length < 2){
             System.out.println("Faltan parametros en el main");
             return;
         }
-        for (String param : args) {
-            if (param.equals("-d"))
-                t.makeTable();
-            if (param.equals("-l"))
-                t.getAllLinks();
+
+        switch (option){
+            case "-d":
+                cp.printTable();
+
+                break;
+            case "-l":
+                //tp.getAllLinks();
+                cp.showAFLinks();
+
+                //cp.showFileLinks();
+                break;
+            case "-t":
+                fp.generateAFCSVwc();
+                break;
+
         }
-        System.out.println();
+
+         System.out.println();
         System.out.println("El programa se ha ejecutado correctamente");
     }
 }
