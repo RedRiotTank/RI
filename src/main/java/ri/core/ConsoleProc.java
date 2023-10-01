@@ -1,10 +1,8 @@
 package ri.core;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Set;
 
 public class ConsoleProc {
@@ -18,7 +16,7 @@ public class ConsoleProc {
         this.tp = tp;
     }
 
-    public void printTable() throws IOException {
+    public void printTable() {
         ArrayList<String> names = fp.getAFNames();
         ArrayList<String> formats = tp.getAFFormats();
         ArrayList<String> encodings = tp.getEncodings();
@@ -49,7 +47,7 @@ public class ConsoleProc {
 
         for (File file : fp.getFiles()) {
 
-            System.out.println("File" + file.getName());
+            System.out.println("File " + file.getName());
             Set<String> links = tp.getFlinks(file);
             for (String link : links)
                 System.out.println("    " + link + "\n");

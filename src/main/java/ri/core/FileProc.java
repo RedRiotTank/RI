@@ -6,9 +6,7 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.*;
-import java.util.function.Consumer;
 import java.util.function.Function;
-import java.util.function.Supplier;
 
 public class FileProc {
     private final String FOLDER_PATH;
@@ -66,7 +64,7 @@ public class FileProc {
                 csvWriter.write(entry.getKey() + ";" + entry.getValue() + "\n");
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            System.err.println("Error con el fichero " + csvPath);
         }
 
         System.out.println("CSV generado para " + filename);

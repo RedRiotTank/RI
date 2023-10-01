@@ -2,7 +2,6 @@ package ri.core;
 
 import org.apache.tika.exception.TikaException;
 
-import java.io.File;
 import java.io.IOException;
 
 public class Main {
@@ -23,14 +22,6 @@ public class Main {
         TextProc tp = new TextProc(fp);
 
         ConsoleProc cp = new ConsoleProc(fp, tp);
-
-
-
-        // si faltan parametros se para la ejecución
-        if(args.length < 2){
-            System.out.println("Faltan parametros en el main");
-            return;
-        }
 
         switch (option){
             case "-d":
