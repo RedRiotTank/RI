@@ -5,8 +5,9 @@ public enum RegexController {
         EMDASH("—|-"),
         EXPRESIONSIGS("¿|\\?|¡|!"),
         PUNCTUATION(",|;|:|\\.{2,}|…"),
-        QUOTES("“|”|\"|«|»"),
+        QUOTES("“|”|\"|«|»|'|`"),
         DOTANDSPACE("\\.\\s"),
+        DELIMITORS("[\\[\\]\\(\\)\\{\\}]"),
         SPACE(" "),
         ANYOSSEPARATOR("[\\\\\\/]");
 

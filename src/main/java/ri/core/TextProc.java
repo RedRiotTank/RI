@@ -50,7 +50,7 @@ public class TextProc {
             try {
                 InputStream is = new FileInputStream(file);
                 Metadata metadata = new Metadata();
-                BodyContentHandler ch = new BodyContentHandler();
+                BodyContentHandler ch = new BodyContentHandler(tika.getMaxStringLength());
                 ParseContext parseContext = new ParseContext();
 
                 AutoDetectParser parser = new AutoDetectParser();
@@ -79,7 +79,7 @@ public class TextProc {
             try {
                 InputStream is = new FileInputStream(file);
                 Metadata metadata = new Metadata();
-                BodyContentHandler ch = new BodyContentHandler();
+                BodyContentHandler ch = new BodyContentHandler(tika.getMaxStringLength());
 
                 AutoDetectParser parser = new AutoDetectParser();
                 parser.parse(is, ch, metadata);
@@ -114,7 +114,7 @@ public class TextProc {
             if(utils.isHTML(file)){
 
                 LinkContentHandler linkContentHandler = new LinkContentHandler();
-                ContentHandler textHandler = new BodyContentHandler();
+                ContentHandler textHandler = new BodyContentHandler(tika.getMaxStringLength());
                 ToHTMLContentHandler toHTMLContentHandler = new ToHTMLContentHandler();
 
                 TeeContentHandler teeContentHandler = new TeeContentHandler(linkContentHandler, textHandler, toHTMLContentHandler);
@@ -139,7 +139,7 @@ public class TextProc {
                 // en caso de que no sea html:
             } else {
                 // se necesitan otros contentHandler
-                BodyContentHandler bodyContentHandler = new BodyContentHandler();
+                BodyContentHandler bodyContentHandler = new BodyContentHandler(tika.getMaxStringLength());
                 AutoDetectParser parser = new AutoDetectParser();
                 parser.parse(is, bodyContentHandler, metadata);
                 String text = bodyContentHandler.toString(); // se obtiene todoo el texto
@@ -174,6 +174,8 @@ public class TextProc {
         processedText = processedText.replaceAll(RegexController.DOTANDSPACE.getRegex(), " ");
 
         processedText = processedText.replaceAll(RegexController.EXPRESIONSIGS.getRegex(), "");
+
+        processedText = processedText.replaceAll(RegexController.DELIMITORS.getRegex(), "");
 
         processedText = processedText.replaceAll(RegexController.QUOTES.getRegex(), "");
 
